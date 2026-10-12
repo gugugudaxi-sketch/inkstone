@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
 import android.view.WindowInsets;
+import android.widget.FrameLayout;
+import android.view.ViewGroup;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -37,20 +39,25 @@ public final class MainActivity extends Activity {
         super.onCreate(saved);
         getWindow().setStatusBarColor(0xfffaf9f7);
         getWindow().setNavigationBarColor(0xfffaf9f7);
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+        FrameLayout container = new FrameLayout(this);
+        container.setBackgroundColor(0xfffaf9f7);
         web = new WebView(this);
         web.setBackgroundColor(0xfffaf9f7);
-        setContentView(web);
-        // Account for system bars with target SDK 35 edge-to-edge enforcement.
-        web.setOnApplyWindowInsetsListener((view, insets) -> {
-            if (Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            } else {
-                view.setPadding(insets.getStableInsetLeft(), insets.getStableInsetTop(),
-                    insets.getStableInsetRight(), insets.getStableInsetBottom());
-            }
-            return insets;
-        });
+        container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Inset the actual WebView rectangle: WebView padding does not reliably
+        // move its CSS viewport, especially position:fixed headers on OEM devices.
+        if (Build.VERSION.SDK_INT >= 30) {
+            container.setOnApplyWindowInsetsListener((view, insets) -> {
+                android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                FrameLayout.LayoutParams bounds = (FrameLayout.LayoutParams) web.getLayoutParams();
+                bounds.setMargins(safe.left, safe.top, safe.right, safe.bottom);
+                web.setLayoutParams(bounds);
+                return WindowInsets.CONSUMED;
+            });
+        }
+        setContentView(container);
+        container.requestApplyInsets();
         attachmentDir = new File(getFilesDir(), "attachments");
         attachmentDir.mkdirs();
         WebSettings settings = web.getSettings();

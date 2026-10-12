@@ -21,6 +21,17 @@ public class LocalStorageTest {
         assertTrue("JavaScript callback timed out", latch.await(10, TimeUnit.SECONDS));
         return result.get();
     }
+    private void assertSafeSystemBarBounds(MainActivity activity, WebView web) throws Exception {
+        getInstrumentation().runOnMainSync(() -> {
+            android.view.WindowInsets insets = activity.getWindow().getDecorView().getRootWindowInsets();
+            android.graphics.Insets safe = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+            int[] position = new int[2]; web.getLocationOnScreen(position);
+            assertTrue("Web content overlaps status bar or display cutout", position[1] >= safe.top);
+            assertTrue("Web content overlaps left display cutout", position[0] >= safe.left);
+            int height = activity.getWindow().getDecorView().getHeight();
+            assertTrue("Web content overlaps navigation bar", position[1] + web.getHeight() <= height - safe.bottom);
+        });
+    }
     private void ready(WebView web) throws Exception {
         for (int i = 0; i < 300; i++) {
             if ("true".equals(eval(web, "typeof window.inkstoneNativeBack === 'function'"))) return;
@@ -43,6 +54,7 @@ public class LocalStorageTest {
         scenario.onActivity(activity::set);
         WebView web = activity.get().webForTesting();
         ready(web);
+        assertSafeSystemBarBounds(activity.get(), web);
         String created = async(web,
             "const r=await fetch('/api/notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:'01j00000000000000000000099',title:'离线测试',content:'本地持久化'})});" +
             "if(!r.ok)throw Error('note save failed');" +
@@ -58,6 +70,7 @@ public class LocalStorageTest {
         getInstrumentation().runOnMainSync(web::reload);
         for (int i = 0; i < 100 && "true".equals(eval(web, "window.__previousPage === true")); i++) Thread.sleep(100);
         ready(web);
+        assertSafeSystemBarBounds(activity.get(), web);
         String reopened = async(web,
             "const n=await(await fetch('/api/notes/01j00000000000000000000099')).json();" +
             "const s=await(await fetch('/api/settings')).json();const a=await(await fetch('/api/files')).json();" +
