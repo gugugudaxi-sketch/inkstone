@@ -93,7 +93,8 @@ public class LocalStorageTest {
         android.content.Intent selected = new android.content.Intent().setData(markdown);
         android.content.ClipData clip = android.content.ClipData.newRawUri("test files", markdown);
         clip.addItem(new android.content.ClipData.Item(archive));
-        selected.setClipData(clip).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        selected.setClipData(clip);
+        selected.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
         assertEquals(2, MainActivity.selectedDocumentUris(android.app.Activity.RESULT_OK, selected).length);
         assertNull(MainActivity.selectedDocumentUris(android.app.Activity.RESULT_CANCELED, selected));
         android.content.IntentFilter filter = new android.content.IntentFilter(android.content.Intent.ACTION_OPEN_DOCUMENT);
