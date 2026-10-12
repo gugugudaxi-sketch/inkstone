@@ -598,3 +598,11 @@
   [data-editor-layout='split'] > div { min-height: 0; }
   .editor-toolbar button { min-width: 44px; min-height: 44px; }
 }
+
+html[data-custom-font-loaded] .ink-editor[data-family='sans'] .cm-editor {
+  font-family: var(--font-ui-default);
+}
+html[data-custom-font-editor] .ink-editor .cm-editor,
+html[data-custom-font-editor] .ink-editor[data-family='sans'] .cm-editor {
+  font-family: var(--custom-font), var(--font-ui-default);
+}

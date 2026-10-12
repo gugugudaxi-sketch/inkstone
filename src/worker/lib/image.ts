@@ -1,3 +1,4 @@
+import { detectFontMime } from '@shared/fonts'
 
 
 
@@ -157,6 +158,8 @@ export const ALLOWED_MIME = new Set([
 
 
 export function safeAttachmentMime(bytes: Uint8Array, reportedMime: string): string {
+  const fontMime = detectFontMime(bytes)
+  if (fontMime) return fontMime
   const normalized = reportedMime.trim().toLowerCase().split(';', 1)[0] || 'application/octet-stream'
   if (!ALLOWED_MIME.has(normalized)) return 'application/octet-stream'
   if (isInlineSafe(normalized) && !hasExpectedImageSignature(bytes, normalized)) {

@@ -1,3 +1,4 @@
+import { FONT_MIMES, fontMimeFromSignature, type CustomFontBackupSettings } from '@shared/fonts'
 /** Produces restorable JSON, readable Markdown, and attachment files for every backup target. */
 import {
   backupAttachmentPath,
@@ -12,7 +13,7 @@ import {
   MARKDOWN_BACKUP_FORMAT,
   MARKDOWN_BACKUP_VERSION,
 } from '@shared/backup-format'
-import { APP_VERSION, LIMITS } from '@shared/constants'
+import { APP_VERSION, LIMITS, mergeSettings } from '@shared/constants'
 import { extractAttachmentIds } from '@shared/markdown-utils'
 import { truncateText } from '@shared/text-utils'
 import type { ExportBundle } from '@shared/types'
@@ -185,6 +186,24 @@ export async function buildSnapshot(env: Env, userId: string): Promise<Snapshot>
     if (page.results.length < NOTE_PAGE_SIZE) break
   }
 
+  const user = await env.DB.prepare('SELECT settings FROM users WHERE id = ?1').bind(userId).first<{ settings: string }>()
+  const fontSettings = mergeSettings(user ? JSON.parse(user.settings) : {}).appearance.customFont
+  const customFont: CustomFontBackupSettings = {
+    fonts: [], activeHash: null, interface: fontSettings.interface, editor: fontSettings.editor, prose: fontSettings.prose,
+  }
+  await loadReferencedAttachments(env.DB, userId, new Set(fontSettings.fonts.map((font) => font.id)), attachmentsById)
+  for (const font of fontSettings.fonts) {
+    const row = attachmentsById.get(font.id)
+    if (!row || !FONT_MIMES.has(row.mime)) throw new Error(`Font missing from backup: ${font.name}`)
+    validateAttachmentRow(row)
+    if (!selectedAttachmentsByHash.has(row.sha256)) {
+      selectedAttachmentsByHash.set(row.sha256, row)
+      attachmentPathByHash.set(row.sha256, backupAttachmentPath(row.sha256, safeSegment(row.filename)))
+    }
+    if (!customFont.fonts.some((item) => item.sha256 === row.sha256)) customFont.fonts.push({ sha256: row.sha256, name: font.name })
+    if (font.id === fontSettings.activeId) customFont.activeHash = row.sha256
+  }
+
   const selectedAttachmentRows = [...selectedAttachmentsByHash.values()]
     .sort((a, b) => a.sha256.localeCompare(b.sha256))
 
@@ -219,6 +238,7 @@ export async function buildSnapshot(env: Env, userId: string): Promise<Snapshot>
     snapshot: stamp,
     notes: noteEntries,
     attachments: attachmentEntries,
+    ...(customFont.fonts.length ? { customFont } : {}),
   }
   if (!parseMarkdownBackupManifest(manifest)) {
     throw new Error('The backup contains metadata that cannot be restored safely')
@@ -492,7 +512,8 @@ function verifyAttachmentStream(
     },
     async flush() {
       if (bytes !== row.size) await fail(`Attachment size does not match: ${row.filename}`)
-      if (safeAttachmentMime(prefix, row.mime) !== row.mime) {
+      const detectedMime = FONT_MIMES.has(row.mime) ? fontMimeFromSignature(prefix) : safeAttachmentMime(prefix, row.mime)
+      if (detectedMime !== row.mime) {
         await fail(`Attachment type metadata does not match: ${row.filename}`)
       }
       await digestWriter.close()

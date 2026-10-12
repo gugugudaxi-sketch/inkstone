@@ -1,3 +1,4 @@
+import { FONT_MIMES } from '@shared/fonts'
 import { Hono } from 'hono'
 import { mergeSettings, mergeSettingsPatch } from '@shared/constants'
 import type { UserSettings } from '@shared/types'
@@ -37,6 +38,11 @@ settingsRoutes.put('/', async (c) => {
   for (let attempt = 0; attempt < 5; attempt++) {
 
     const merged = mergeSettingsPatch(parse(previousRaw), incoming)
+    for (const font of merged.appearance.customFont.fonts) {
+      const attachment = await c.env.DB.prepare('SELECT mime FROM attachments WHERE id = ?1 AND user_id = ?2')
+        .bind(font.id, userId).first<{ mime: string }>()
+      if (!attachment || !FONT_MIMES.has(attachment.mime)) throw ApiError.badRequest('Font not found or not owned by this account')
+    }
     const nextRaw = JSON.stringify(merged)
     const updated = await c.env.DB.prepare(
       `UPDATE users SET settings = ?1 WHERE id = ?2 AND settings = ?3`,

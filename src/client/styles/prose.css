@@ -1014,3 +1014,14 @@
     break-inside: avoid;
   }
 }
+
+html[data-custom-font-loaded] .ink-prose {
+  font-family: var(--font-ui-default);
+}
+html[data-custom-font-loaded] .ink-prose[data-font='serif'] {
+  font-family: var(--font-serif);
+}
+html[data-custom-font-prose] .ink-prose,
+html[data-custom-font-prose] .ink-prose[data-font='serif'] {
+  font-family: var(--custom-font), var(--font-ui-default);
+}

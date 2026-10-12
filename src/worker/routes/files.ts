@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
-import { LIMITS } from '@shared/constants'
+import { LIMITS, mergeSettings } from '@shared/constants'
 import { extractAttachmentIds } from '@shared/markdown-utils'
 import type { Attachment } from '@shared/types'
 import {
@@ -283,6 +283,11 @@ filesRoutes.delete('/:id', requireAuth, async (c) => {
     .bind(id, userId)
     .first<AttachmentRow>()
   if (!row) throw ApiError.notFound('Attachment not found')
+
+  const userSettings = await c.env.DB.prepare('SELECT settings FROM users WHERE id = ?1').bind(userId).first<{ settings: string }>()
+  if (userSettings && mergeSettings(JSON.parse(userSettings.settings)).appearance.customFont.fonts.some((font) => font.id === id)) {
+    throw ApiError.badRequest('Remove this font from Appearance settings before deleting its file')
+  }
 
   const statements: D1PreparedStatement[] = [
     c.env.DB.prepare(

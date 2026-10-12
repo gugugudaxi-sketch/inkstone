@@ -1,3 +1,4 @@
+import type { CustomFontSettings } from './fonts'
 
 
 
@@ -92,6 +93,7 @@ export type EditorLayout = 'live' | 'split' | 'preview'
 export type BackupSchedule = 'off' | 'hourly' | 'sixHourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 export interface AppearanceSettings {
+  customFont: CustomFontSettings
   language: AppLocale
   theme: ThemePref
   accent: AccentName

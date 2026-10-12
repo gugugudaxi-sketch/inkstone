@@ -1,3 +1,4 @@
+import { CustomFontLoader } from './lib/custom-font'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { ConfirmHost } from './components/overlay'
 import { Toaster } from './components/feedback'
@@ -75,6 +76,7 @@ export function App() {
           </Suspense>
         )}
       </ErrorBoundary>
+      {status === 'authed' && <CustomFontLoader />}
       <Toaster />
       <ConfirmHost />
     </>

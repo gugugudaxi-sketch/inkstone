@@ -1,3 +1,4 @@
+import { useSession } from '../../store/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Download, FileJson, FileUp, FolderOpen, ImageIcon, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -73,6 +74,7 @@ export function DataSettings() {
         });
     };
     const reportImport = async (result: Awaited<ReturnType<typeof api.transfer.import>>) => {
+        await useSession.getState().refreshSettings();
         const refreshed = await pull({ force: true }).then(() => true, () => false);
         void loadStats();
         const summary = t("settings.created_value0_updated_value1_skipped_value2_restored_value3_attachments", { value0: result.createdNotes, value1: result.updatedNotes, value2: result.skippedNotes, value3: result.createdAttachments, value4: result.skippedAttachments });

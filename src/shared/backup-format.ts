@@ -1,3 +1,4 @@
+import { FONT_MIMES, MAX_CUSTOM_FONTS, type CustomFontBackupSettings } from './fonts'
 import { LIMITS } from './constants'
 
 export const MARKDOWN_BACKUP_FORMAT = 'inkstone-markdown-backup'
@@ -33,6 +34,7 @@ export interface MarkdownBackupAttachmentEntry {
 }
 
 export interface MarkdownBackupManifest {
+  customFont?: CustomFontBackupSettings
   format: typeof MARKDOWN_BACKUP_FORMAT
   version: MarkdownBackupVersion
   appVersion: string
@@ -182,7 +184,25 @@ export function parseMarkdownBackupManifest(value: unknown): MarkdownBackupManif
   }
   if (notes.some((note) => note.attachmentHashes.some((hash) => !hashes.has(hash)))) return null
 
+  let customFont: CustomFontBackupSettings | undefined
+  if (value.customFont !== undefined) {
+    const raw = value.customFont
+    if (!isRecord(raw) || !Array.isArray(raw.fonts) || raw.fonts.length > MAX_CUSTOM_FONTS) return null
+    const fontHashes = new Set<string>()
+    const fonts: CustomFontBackupSettings['fonts'] = []
+    for (const font of raw.fonts) {
+      if (!isRecord(font) || typeof font.sha256 !== 'string' || !HASH_RE.test(font.sha256) || fontHashes.has(font.sha256)) return null
+      if (typeof font.name !== 'string' || !font.name.trim() || font.name.length > 120 || /[\u0000-\u001f]/.test(font.name)) return null
+      if (!attachments.some((file) => file.sha256 === font.sha256 && FONT_MIMES.has(file.mime))) return null
+      fontHashes.add(font.sha256)
+      fonts.push({ sha256: font.sha256, name: font.name })
+    }
+    if (raw.activeHash !== null && (typeof raw.activeHash !== 'string' || !fontHashes.has(raw.activeHash))) return null
+    if (typeof raw.interface !== 'boolean' || typeof raw.editor !== 'boolean' || typeof raw.prose !== 'boolean') return null
+    customFont = { fonts, activeHash: raw.activeHash as string | null, interface: raw.interface, editor: raw.editor, prose: raw.prose }
+  }
   return {
+    ...(customFont ? { customFont } : {}),
     format: MARKDOWN_BACKUP_FORMAT,
     version: value.version,
     appVersion: value.appVersion,

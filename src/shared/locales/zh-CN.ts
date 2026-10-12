@@ -1,5 +1,27 @@
-import type { MessageKey } from './en-US';
+import type {
+ MessageKey } from './en-US';
 export const ZH_CN_MESSAGES = {
+    "fonts.title": "自定义字体",
+    "fonts.hint": "上传 WOFF2、WOFF、TTF 或 OTF，单个不超过 25 MB，最多保存 10 个。字体保存到你的账户，并随完整 ZIP 备份导出。",
+    "fonts.upload": "上传字体",
+    "fonts.uploading": "正在检查并上传…",
+    "fonts.reset": "恢复默认字体",
+    "fonts.choose": "选择字体",
+    "fonts.default": "使用内置字体",
+    "fonts.apply_to": "应用范围",
+    "fonts.interface": "界面文字",
+    "fonts.editor": "编辑正文",
+    "fonts.prose": "阅读正文",
+    "fonts.loading": "正在加载字体…",
+    "fonts.load_failed": "字体加载失败，已使用默认字体。联网后可重新选择。",
+    "fonts.ready": "字体已加载，设置将自动保存。",
+    "fonts.sample": "愿每一个想法，都有自己的模样。 Aa Bb 0123456789",
+    "fonts.remove": "移出字体库",
+    "fonts.invalid_file": "请选择有效的 WOFF2、WOFF、TTF 或 OTF 字体，且不超过 25 MB。",
+    "fonts.unsupported": "当前浏览器不支持加载自定义字体。",
+    "fonts.limit": "最多保存 10 个字体，请先移除一个。",
+    "fonts.upload_failed": "字体上传失败",
+
     "editor.search.find": "查找",
     "editor.search.replace": "替换",
     "editor.search.find_in_note": "在当前笔记中查找",

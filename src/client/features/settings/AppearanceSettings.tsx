@@ -1,3 +1,4 @@
+import { CustomFontSettings } from './CustomFontSettings'
 import type { AccentName, AppLocale, BackgroundName, ProseFont, ProseWidth, ThemePref, UiDensity } from '@shared/types'
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -180,6 +181,7 @@ export function AppearanceSettings({
         </SettingRow>
       </section>
 
+      <CustomFontSettings />
       <PreviewSample />
     </div>
   )

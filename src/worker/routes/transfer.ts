@@ -1,3 +1,5 @@
+import { notifySyncHub } from '../realtime/sync-hub'
+import { FONT_MIMES, MAX_CUSTOM_FONTS } from '@shared/fonts'
 import { Hono } from 'hono'
 import {
   backupCompletePath,
@@ -11,7 +13,7 @@ import {
   type MarkdownBackupManifest,
   type MarkdownBackupNoteEntry,
 } from '@shared/backup-format'
-import { LIMITS } from '@shared/constants'
+import { LIMITS, mergeSettings } from '@shared/constants'
 import { countText, deriveExcerpt, deriveTitle, splitFrontMatter } from '@shared/markdown-utils'
 import { truncateText, utf8ByteLength } from '@shared/text-utils'
 import { organizerColorOrNull } from '@shared/organizer-colors'
@@ -32,6 +34,7 @@ import {
   buildNoteDerivedStatements,
   pruneOrphanTags,
   runBatched,
+  recordChange,
 } from '../db/writes'
 import { enqueueNoteIndex } from '../mcp/ai-search'
 import {
@@ -449,6 +452,38 @@ async function importBackupFileBatch(
       throw new Error(`The Markdown file is not valid UTF-8: ${entry.path}`)
     }
     await importBackupMarkdown(c, userId, entry, text, manifest, ctx)
+  }
+  if (manifest.customFont) {
+    const incoming = manifest.customFont
+    const restored = await loadExistingAttachments(c.env.DB, userId, incoming.fonts.map((font) => font.sha256))
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const user = await c.env.DB.prepare('SELECT settings FROM users WHERE id = ?1').bind(userId).first<{ settings: string }>()
+      if (!user) break
+      const settings = mergeSettings(JSON.parse(user.settings))
+      const preferences = settings.appearance.customFont
+      for (const font of incoming.fonts) {
+        const row = restored.get(font.sha256)
+        if (row?.user_id === userId && FONT_MIMES.has(row.mime) && !preferences.fonts.some((item) => item.id === row.id)) {
+          if (preferences.fonts.length < MAX_CUSTOM_FONTS) preferences.fonts.push({ id: row.id, name: font.name })
+          else addWarning(ctx.result, 'Font library is full; some restored fonts were not added.')
+        }
+      }
+      const active = incoming.activeHash ? restored.get(incoming.activeHash) : null
+      if (active && preferences.fonts.some((font) => font.id === active.id)) {
+        preferences.activeId = active.id
+        preferences.interface = incoming.interface
+        preferences.editor = incoming.editor
+        preferences.prose = incoming.prose
+      }
+      const result = await c.env.DB.prepare('UPDATE users SET settings = ?1 WHERE id = ?2 AND settings = ?3')
+        .bind(JSON.stringify(settings), userId, user.settings).run()
+      if (result.meta.changes) {
+        const cursor = await recordChange(c.env.DB, userId, 'settings', userId, 'upsert')
+        await notifySyncHub(c.env.SYNC_HUB, userId, cursor, null).catch(() => {})
+        break
+      }
+      if (attempt === 4) throw new Error('Font settings changed during import. Retry the import.')
+    }
   }
 }
 

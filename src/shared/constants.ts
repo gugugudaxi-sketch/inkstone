@@ -1,3 +1,4 @@
+import { normalizeCustomFonts } from './fonts'
 import type { AccentName, UserSettings, ViewKind } from './types'
 import { version as packageVersion } from '../../package.json'
 
@@ -60,6 +61,7 @@ export const VIEW_KINDS: ViewKind[] = ['all', 'recent', 'starred', 'unfiled', 'a
 
 export const DEFAULT_SETTINGS: UserSettings = {
   appearance: {
+    customFont: normalizeCustomFonts(null),
     language: 'zh-CN',
     theme: 'system',
     accent: 'cinnabar',
@@ -130,6 +132,7 @@ export function mergeSettings(partial: unknown): UserSettings {
   const backup = asRecord(src.backup)
   const sync = asRecord(src.sync)
 
+  base.appearance.customFont = normalizeCustomFonts(appearance.customFont)
   base.appearance.theme = enumValue(appearance.theme, THEMES, base.appearance.theme)
   base.appearance.language = enumValue(
     appearance.language,

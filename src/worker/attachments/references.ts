@@ -1,3 +1,4 @@
+import { mergeSettings } from '@shared/constants'
 import { extractAttachmentIds } from '@shared/markdown-utils'
 
 const REFERENCE_SCAN_PAGE_SIZE = 10
@@ -9,6 +10,15 @@ export async function collectAttachmentReferences(
 ): Promise<Map<string, number>> {
   const references = new Map<string, number>()
   if (wantedIds?.size === 0) return references
+
+  const user = await db.prepare('SELECT settings FROM users WHERE id = ?1').bind(userId).first<{ settings: string }>()
+  if (user) {
+    try {
+      for (const font of mergeSettings(JSON.parse(user.settings)).appearance.customFont.fonts) {
+        if (!wantedIds || wantedIds.has(font.id)) references.set(font.id, 1)
+      }
+    } catch {}
+  }
 
   // Retained versions must remain restorable after unused attachments are pruned.
   for (const table of ['notes', 'note_versions'] as const) {
