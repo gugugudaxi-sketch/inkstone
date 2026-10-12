@@ -190,8 +190,10 @@ export function DataSettings() {
         <input ref={fileRef} type="file" hidden multiple accept=".md,.markdown,.txt,.json,.zip" onChange={async (event) => {
             const files = [...(event.target.files ?? [])];
             event.target.value = '';
-            if (!files.length)
+            if (!files.length) {
+                toast({ title: "没有读取到文件", description: "请将文件保存到手机后重新选择。", tone: 'warning' });
                 return;
+            }
             await run('import', async () => {
                 try {
                     const result = await api.transfer.import(files);

@@ -2,6 +2,8 @@ package dev.inkstone.local;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ClipData;
+import android.widget.Toast;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -64,7 +66,9 @@ public final class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        // Document picker returns content:// URIs. Keep raw filesystem access
+        // disabled, but permit the user's selected document provider files.
+        settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSupportMultipleWindows(false);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
@@ -111,9 +115,10 @@ public final class MainActivity extends Activity {
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("*/*");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
                 try { startActivityForResult(intent, PICK_FILE); }
-                catch (Exception error) { fileCallback.onReceiveValue(null); fileCallback = null; }
+                catch (Exception error) { fileCallback.onReceiveValue(null); fileCallback = null; Toast.makeText(MainActivity.this, "无法打开系统文件选择器", Toast.LENGTH_LONG).show(); }
                 return true;
             }
         });
@@ -136,8 +141,27 @@ public final class MainActivity extends Activity {
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (request == PICK_FILE && fileCallback != null) {
-            fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
+            final ValueCallback<Uri[]> callback = fileCallback;
             fileCallback = null;
+            final Uri[] selected = selectedDocumentUris(result, data);
+            if (selected == null) { callback.onReceiveValue(null); return; }
+            io.execute(() -> {
+                try {
+                    for (Uri uri : selected) {
+                        if (!"content".equals(uri.getScheme())) throw new IOException("Unsupported document URI");
+                        try (InputStream input = getContentResolver().openInputStream(uri)) {
+                            if (input == null) throw new IOException("Document is not readable");
+                            input.read();
+                        }
+                    }
+                    runOnUiThread(() -> callback.onReceiveValue(selected));
+                } catch (Exception error) {
+                    runOnUiThread(() -> {
+                        callback.onReceiveValue(null);
+                        Toast.makeText(MainActivity.this, "无法读取选中的文件，请先将它保存到手机，再重新选择。", Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
         } else if (request == SAVE_FILE) {
             if (result != RESULT_OK || data == null || data.getData() == null) { downloadResult(null); return; }
             Uri target = data.getData();
@@ -151,6 +175,17 @@ public final class MainActivity extends Activity {
                 } catch (Exception error) { downloadResult("保存失败，请检查所选文件夹和剩余空间"); }
             });
         }
+    }
+    static Uri[] selectedDocumentUris(int result, Intent data) {
+        if (result != RESULT_OK || data == null) return null;
+        Set<Uri> uris = new LinkedHashSet<>();
+        ClipData clip = data.getClipData();
+        if (clip != null) for (int i = 0; i < clip.getItemCount(); i++) {
+            Uri uri = clip.getItemAt(i).getUri();
+            if (uri != null) uris.add(uri);
+        }
+        if (uris.isEmpty() && data.getData() != null) uris.add(data.getData());
+        return uris.isEmpty() ? null : uris.toArray(new Uri[0]);
     }
     private void downloadResult(String error) {
         runOnUiThread(() -> {
