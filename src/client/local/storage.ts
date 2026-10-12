@@ -1,4 +1,5 @@
 import { createDemoState, type DemoState } from '../demo/state'
+import { installLocalWelcome } from './welcome'
 
 export const LOCAL_DB_NAME = 'inkstone-local-vault'
 const STORE = 'vault'
@@ -19,6 +20,7 @@ export function freshLocalState(): DemoState {
   state.tagColors.clear()
   state.shares.clear()
   state.settings.sync.realtime = false
+  installLocalWelcome(state)
   return state
 }
 
@@ -85,6 +87,7 @@ export async function loadLocalState(): Promise<DemoState> {
       for (const version of versions) version.content = version.content.replaceAll(meta.url, url)
     }
   }
+  if (installLocalWelcome(state)) await saveLocalState(state)
   return state
 }
 

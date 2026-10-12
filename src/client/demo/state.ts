@@ -27,6 +27,7 @@ export interface DemoShare {
 }
 
 export interface DemoState {
+  localWelcomeInstalled?: boolean
   authenticated: boolean
   password: string
   registrationOpen: boolean

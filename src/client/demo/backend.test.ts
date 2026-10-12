@@ -9,6 +9,7 @@ const request = (path: string, method = 'GET', body?: unknown) => new Request(ur
 })
 function local() {
   const state = freshLocalState()
+  state.notes.clear() // Backend tests use an empty vault; onboarding is tested separately.
   let saved: DemoState | undefined
   const backend = createDemoBackend({ state, local: true, persist: async (value) => { saved = cloneBackendState(value) } })
   return { state, backend, saved: () => saved! }
@@ -31,6 +32,7 @@ describe('durable local notebook', () => {
   })
   it('acknowledges a save only after persistence and rolls back on failure', async () => {
     const state = freshLocalState()
+  state.notes.clear() // Backend tests use an empty vault; onboarding is tested separately.
     const backend = createDemoBackend({ state, local: true, persist: async () => { throw new Error('disk full') } })
     expect((await backend.fetch(request('notes', 'POST', { title: '不能假装保存' }))).status).toBe(507)
     expect(state.notes.size).toBe(0)

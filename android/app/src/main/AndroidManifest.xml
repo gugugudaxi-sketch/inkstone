@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Intentionally no INTERNET permission. All app assets and data are local. -->
-    <application android:label="Inkstone 本地版" android:icon="@drawable/ic_inkstone"
+    <application android:label="Inkstone" android:icon="@drawable/ic_inkstone"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:allowBackup="false" android:fullBackupContent="false" android:usesCleartextTraffic="false"
         android:enableOnBackInvokedCallback="false">
