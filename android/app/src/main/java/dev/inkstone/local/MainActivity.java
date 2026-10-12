@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.view.WindowInsets;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -40,8 +42,13 @@ public final class MainActivity extends Activity {
         setContentView(web);
         // Account for system bars with target SDK 35 edge-to-edge enforcement.
         web.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-                insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            } else {
+                view.setPadding(insets.getStableInsetLeft(), insets.getStableInsetTop(),
+                    insets.getStableInsetRight(), insets.getStableInsetBottom());
+            }
             return insets;
         });
         attachmentDir = new File(getFilesDir(), "attachments");

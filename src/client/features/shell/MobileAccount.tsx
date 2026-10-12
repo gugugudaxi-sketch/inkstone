@@ -1,3 +1,4 @@
+import { useEscape } from '../../components/overlay'
 import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { useState } from 'react';
 import { ArrowLeft, ChevronRight, LogOut, Waypoints } from 'lucide-react';
@@ -15,6 +16,7 @@ export function MobileAccount() {
     const logout = useSession((s) => s.logout);
     const [section, setSection] = useState<SettingsSection | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
+    useEscape(IS_LOCAL_MODE && section !== null, () => setSection(null));
     if (section) return <section className="mobile-settings-detail flex h-full min-h-0 flex-col bg-[var(--bg-surface)]">
         <header className="relative flex min-h-14 shrink-0 items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3">
             <button type="button" aria-label={t('mobile.back_to_account')} onClick={() => setSection(null)} className="flex size-11 items-center justify-center rounded-lg active:bg-[var(--bg-active)]"><ArrowLeft size={20}/></button>

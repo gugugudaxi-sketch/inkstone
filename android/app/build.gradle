@@ -24,7 +24,7 @@ android {
         }
     }
     buildTypes {
-        release { minifyEnabled false; signingConfig signingConfigs.localRelease }
+        release { minifyEnabled false; signingConfig System.getenv('INKSTONE_KEYSTORE') ? signingConfigs.localRelease : null }
     }
 }
 dependencies {
