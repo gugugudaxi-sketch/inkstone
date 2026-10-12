@@ -8,6 +8,21 @@ import { getVisibleViewport } from '../lib/viewport';
 
 
 const escStack: (() => void)[] = [];
+const escapeStackListeners = new Set<() => void>();
+export function subscribeEscapeStack(listener: () => void): () => void {
+    escapeStackListeners.add(listener);
+    return () => { escapeStackListeners.delete(listener); };
+}
+export function getEscapeStackDepth(): number { return escStack.length; }
+export function dismissTopOverlay(): boolean {
+    const dismiss = escStack[escStack.length - 1];
+    if (!dismiss) return false;
+    dismiss();
+    return true;
+}
+function notifyEscapeStack(): void {
+    for (const listener of escapeStackListeners) listener();
+}
 export function useEscape(active: boolean, onEscape: () => void): void {
     const callbackRef = useRef(onEscape);
     callbackRef.current = onEscape;
@@ -16,6 +31,7 @@ export function useEscape(active: boolean, onEscape: () => void): void {
             return;
         const handler = () => callbackRef.current();
         escStack.push(handler);
+        notifyEscapeStack();
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key !== 'Escape' || event.isComposing || event.repeat || event.defaultPrevented)
                 return;
@@ -32,6 +48,7 @@ export function useEscape(active: boolean, onEscape: () => void): void {
             const index = escStack.indexOf(handler);
             if (index >= 0)
                 escStack.splice(index, 1);
+            notifyEscapeStack();
         };
     }, [active]);
 }

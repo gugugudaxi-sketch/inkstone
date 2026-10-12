@@ -4,6 +4,7 @@ import { cn } from '../../lib/cn';
 import { registerAll } from '../../lib/hotkeys';
 import { APP_SHORTCUTS } from '../../lib/shortcuts';
 import { useBreakpoint } from '../../lib/hooks';
+import { useMobileBack } from '../../lib/mobile-back';
 import { useSyncEngine } from '../../lib/sync';
 import { Drawer } from '../../components/overlay';
 import { IconButton } from '../../components/primitives';
@@ -131,6 +132,7 @@ export function AppShell() {
 }
 
 function MobileShell() {
+    useMobileBack();
     const pane = useUi((s) => s.mobilePane);
     const setPane = useUi((s) => s.setMobilePane);
     const activeNoteId = useUi((s) => s.activeNoteId);
