@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final int PICK_FILE = 10, SAVE_FILE = 11;
-    private WebView web;
+    private WebView web, printWeb;
     private ValueCallback<Uri[]> fileCallback;
     private final java.util.concurrent.ExecutorService io = Executors.newSingleThreadExecutor();
     private File attachmentDir, exportTemp;
@@ -217,8 +217,21 @@ public final class MainActivity extends Activity {
             } catch (Exception ignored) {}
         }
         @JavascriptInterface public void background() { runOnUiThread(() -> moveTaskToBack(true)); }
-        @JavascriptInterface public void printDocument() {
-            runOnUiThread(() -> ((PrintManager)getSystemService(PRINT_SERVICE)).print("Inkstone 笔记", web.createPrintDocumentAdapter("Inkstone"), null));
+        @JavascriptInterface public void printDocument(String html) {
+            if (html == null || html.length() > 20 * 1024 * 1024) return;
+            runOnUiThread(() -> {
+                if (printWeb != null) printWeb.destroy();
+                printWeb = new WebView(MainActivity.this);
+                printWeb.getSettings().setJavaScriptEnabled(false);
+                printWeb.getSettings().setAllowFileAccess(false);
+                printWeb.setWebViewClient(new WebViewClient() {
+                    @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) { return blocked(); }
+                    @Override public void onPageFinished(WebView view, String url) {
+                        ((PrintManager)getSystemService(PRINT_SERVICE)).print("Inkstone 笔记", view.createPrintDocumentAdapter("Inkstone"), null);
+                    }
+                });
+                printWeb.loadDataWithBaseURL(ORIGIN + "/", html, "text/html", "UTF-8", null);
+            });
         }
     }
 }

@@ -84,3 +84,29 @@ describe('durable local notebook', () => {
     for (const path of ['mcp', 'backup/targets', 'share', 'auth/logout']) expect((await backend.fetch(request(path))).status).toBe(403)
   })
 })
+
+it('imports the current web Markdown ZIP, including folders and font references', async () => {
+  const { createZip } = await import('@shared/zip')
+  const { backupCompleteBody } = await import('@shared/backup-format')
+  const hash = async (data: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', data.slice().buffer))].map((b) => b.toString(16).padStart(2, '0')).join('')
+  const bytes = new TextEncoder().encode('font bytes')
+  const digest = await hash(bytes)
+  const path = `attachments/${digest}--my.woff2`
+  const noteBytes = new TextEncoder().encode(`![字体](../../${path})\n#测试`)
+  const manifest = {
+    format: 'inkstone-markdown-backup', version: 3, appVersion: '0.8.0', createdAt: new Date().toISOString(), snapshot: '20261012-070000-000',
+    notes: [{ id: '01j00000000000000000000007', path: 'notes/目录/笔记.md', title: '笔记', folder: ['目录'], attachmentHashes: [digest], state: 'notes', archived: false, bytes: noteBytes.length, sha256: await hash(noteBytes), createdAt: Date.now(), updatedAt: Date.now(), deletedAt: null }],
+    attachments: [{ path, filename: 'my.woff2', mime: 'font/woff2', size: bytes.length, sha256: digest, createdAt: Date.now() }],
+    customFont: { fonts: [{ sha256: digest, name: '我的字体' }], activeHash: digest, interface: true, editor: true, prose: true },
+  }
+  const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest))
+  const archive = createZip([{ path: 'manifest.json', data: manifestBytes }, { path: 'COMPLETE', data: new TextEncoder().encode(backupCompleteBody(await hash(manifestBytes))) }, { path: 'notes/目录/笔记.md', data: noteBytes }, { path, data: bytes }])
+  const { backend, saved } = local()
+  const form = new FormData(); form.append('file', new File([archive.slice().buffer], 'web.zip'))
+  const result = await (await backend.fetch(new Request(url('import'), { method: 'POST', body: form }))).json()
+  expect(result.warnings).toEqual([])
+  expect(saved().notes.size).toBe(1)
+  expect(saved().folders.size).toBe(1)
+  expect(saved().settings.appearance.customFont.activeId).toBe(digest.slice(0, 26))
+  expect([...saved().notes.values()][0]!.content).toContain(`/api/files/${digest.slice(0, 26)}`)
+})

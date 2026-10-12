@@ -34,6 +34,8 @@ export async function exportNoteAsPdf(note: { title: string; content: string }, 
 }
 
 async function printHtml(html: string): Promise<void> {
+  if (window.InkstoneNative) { window.InkstoneNative.printDocument(html); return }
+
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.position = 'fixed'

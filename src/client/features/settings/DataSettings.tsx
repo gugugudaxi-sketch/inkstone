@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { useSession } from '../../store/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Download, FileJson, FileUp, FolderOpen, ImageIcon, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
@@ -162,9 +163,9 @@ export function DataSettings() {
       <section>
         <h3 className="mb-1 text-[11px] font-semibold tracking-[0.06em] text-[var(--text-quaternary)]">{t("settings.import")}</h3>
 
-        <SettingRow title={t("settings.restore_backup_folder")} description={t("settings.restore_backup_folder_description")}>
+        {!IS_LOCAL_MODE && <SettingRow title={t("settings.restore_backup_folder")} description={t("settings.restore_backup_folder_description")}>
           <Button size="sm" icon={<FolderOpen size={13}/>} loading={busy === 'restore-backup'} disabled={busy !== null} onClick={() => backupFolderRef.current?.click()}>{t("settings.select_backup_folder")}</Button>
-        </SettingRow>
+        </SettingRow>}
 
         <input ref={backupFolderRef} type="file" hidden multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={async (event) => {
             const files = [...(event.target.files ?? [])];
@@ -182,7 +183,7 @@ export function DataSettings() {
             });
         }}/>
 
-        <SettingRow title={t("settings.import_file")} description={t("settings.supports_md_txt_zip_and_inkstone_json_exports_for_matching_ids_the_newer")}>
+        <SettingRow title={t("settings.import_file")} description={IS_LOCAL_MODE ? "支持 Markdown、TXT、JSON 和完整 ZIP 备份。已有相同 ID 的笔记会跳过，不覆盖本机内容。" : t("settings.supports_md_txt_zip_and_inkstone_json_exports_for_matching_ids_the_newer")}>
           <Button size="sm" icon={<FileUp size={13}/>} loading={busy === 'import'} disabled={busy !== null} onClick={() => fileRef.current?.click()}>{t("settings.select_file")}</Button>
         </SettingRow>
 

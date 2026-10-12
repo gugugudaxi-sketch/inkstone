@@ -1,14 +1,19 @@
 package dev.inkstone.local;
 
-import android.test.ActivityInstrumentationTestCase2;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import static org.junit.Assert.*;
 import android.webkit.WebView;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-@SuppressWarnings("deprecation")
-public class LocalStorageTest extends ActivityInstrumentationTestCase2<MainActivity> {
-    public LocalStorageTest() { super(MainActivity.class); }
+@RunWith(AndroidJUnit4.class)
+public class LocalStorageTest {
+    private android.app.Instrumentation getInstrumentation() { return InstrumentationRegistry.getInstrumentation(); }
     private String eval(WebView web, String script) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> result = new AtomicReference<>();
@@ -32,8 +37,11 @@ public class LocalStorageTest extends ActivityInstrumentationTestCase2<MainActiv
         }
         fail("Local operation timed out"); return "";
     }
-    public void testOfflineVaultSurvivesReloadAndAttachmentsRender() throws Exception {
-        WebView web = getActivity().webForTesting();
+    @Test public void testOfflineVaultSurvivesReloadAndAttachmentsRender() throws Exception {
+        ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class);
+        AtomicReference<MainActivity> activity = new AtomicReference<>();
+        scenario.onActivity(activity::set);
+        WebView web = activity.get().webForTesting();
         ready(web);
         String created = async(web,
             "const r=await fetch('/api/notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:'01j00000000000000000000099',title:'离线测试',content:'本地持久化'})});" +
@@ -46,7 +54,9 @@ public class LocalStorageTest extends ActivityInstrumentationTestCase2<MainActiv
             "return {saved:true,url:a.url};");
         assertTrue(created, created.contains("saved"));
         assertFalse(created, created.contains("ERROR"));
+        eval(web, "window.__previousPage=true");
         getInstrumentation().runOnMainSync(web::reload);
+        for (int i = 0; i < 100 && "true".equals(eval(web, "window.__previousPage === true")); i++) Thread.sleep(100);
         ready(web);
         String reopened = async(web,
             "const n=await(await fetch('/api/notes/01j00000000000000000000099')).json();" +
@@ -57,5 +67,6 @@ public class LocalStorageTest extends ActivityInstrumentationTestCase2<MainActiv
         assertTrue(reopened, reopened.contains("dark"));
         assertTrue(reopened, reopened.contains("imageWidth"));
         assertFalse(reopened, reopened.contains("ERROR"));
+        scenario.close();
     }
 }

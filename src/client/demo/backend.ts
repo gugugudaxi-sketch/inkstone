@@ -1024,6 +1024,12 @@ export function createDemoBackend(options: BackendOptions = {}): DemoBackend {
             maxTotalBytes: LIMITS.importArchiveExpandedMaxBytes,
           })
           const bundleEntry = entries.find((entry) => entry.path.endsWith('inkstone-export.json'))
+          if (!bundleEntry && options.local) {
+            const { convertMarkdownBackup } = await import('../local/import-backup')
+            const converted = await convertMarkdownBackup(entries)
+            await importBundle(state, converted.bundle, result, converted.files, true)
+            continue
+          }
           if (!bundleEntry) throw new Error('The ZIP does not contain an Inkstone export')
           await importBundle(
             state,
@@ -1272,7 +1278,7 @@ function folderDescendants(state: DemoState, rootId: string): Set<string> {
 function attachmentReferenceCounts(state: DemoState): Map<string, number> {
   const references = new Map<string, number>()
   for (const font of state.settings.appearance.customFont.fonts) references.set(font.id, 1)
-  for (const note of state.notes.values()) {
+  for (const note of [...state.notes.values(), ...[...state.versions.values()].flat()]) {
     for (const id of extractAttachmentIds(note.content)) {
       if (!state.attachments.has(id)) continue
       references.set(id, (references.get(id) ?? 0) + 1)
@@ -1651,6 +1657,7 @@ async function importBundleAttachments(
     if (await sha256Hex(data) !== raw.sha256.toLocaleLowerCase()) {
       throw new Error(`The ZIP attachment checksum failed: ${raw.filename || raw.id}`)
     }
+    if (local && state.attachments.has(raw.id) && await sha256Hex(new Uint8Array(await state.attachments.get(raw.id)!.file.arrayBuffer())) !== raw.sha256.toLowerCase()) throw new Error('已存在同 ID 的不同附件，请先导出备份后再处理')
     importedBytes += data.byteLength
     prepared.push({
       sourceId: raw.id,

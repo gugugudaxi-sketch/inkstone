@@ -11,7 +11,7 @@ interface NativeBridge {
   appendDownload(base64: string): boolean
   finishDownload(): void
   pruneAttachments(ids: string): void
-  printDocument(): void
+  printDocument(html: string): void
   background(): void
 }
 declare global {
@@ -56,7 +56,6 @@ export async function installLocalRuntime(): Promise<void> {
     if (url.origin === location.origin || ['blob:', 'data:'].includes(url.protocol)) return originalFetch(input, init)
     return Promise.reject(new Error('本地版不连接远程服务器'))
   }
-  if (window.InkstoneNative) window.print = () => window.InkstoneNative!.printDocument()
   window.inkstoneNativeBack = () => {
     const depth = history.state?.inkstoneMobileBack?.depth ?? 0
     if (depth > 0) history.back()
