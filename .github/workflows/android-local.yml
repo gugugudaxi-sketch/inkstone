@@ -1,0 +1,70 @@
+name: Android local APK
+on:
+  push:
+    branches: [android-local]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build and test local frontend
+        run: |
+          npm ci
+          npm run test:unit
+          npm run build:local
+          mkdir -p android/app/src/main/assets
+          cp -R dist/local/. android/app/src/main/assets/
+          cp LICENSE android/app/src/main/assets/LICENSE.txt
+      - name: Build Android packages
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
+      - name: Verify APK has no network permission
+        run: |
+          sdkmanager 'build-tools;35.0.0'
+          if "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions android/app/build/outputs/apk/release/app-release-unsigned.apk | grep -q 'android.permission.INTERNET'; then
+            echo 'Unexpected network permission'; exit 1
+          fi
+      - name: Prepare unsigned APK and local signing tool
+        run: |
+          mkdir -p android-output
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk android-output/inkstone-local-1.0.0-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" android-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inkstone-local-unsigned
+          path: android-output/
+          retention-days: 30
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test real Android WebView and persistence
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: cd android && gradle --no-daemon :app:connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-results
+          path: android/app/build/reports/androidTests/

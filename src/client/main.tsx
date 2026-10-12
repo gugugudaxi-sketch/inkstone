@@ -15,6 +15,11 @@ async function start(): Promise<void> {
     await installDemoRuntime()
   }
 
+  if (import.meta.env.MODE === 'offline') {
+    const { installLocalRuntime } = await import('./local/runtime')
+    await installLocalRuntime()
+  }
+
   const [{ App }, i18n] = await Promise.all([import('./App'), import('./lib/i18n')])
   await i18n.initI18n()
   const container = document.getElementById('root')
@@ -26,4 +31,14 @@ async function start(): Promise<void> {
   )
 }
 
-void start()
+void start().catch((error) => {
+  const root = document.getElementById('root')
+  if (root) {
+    root.replaceChildren()
+    const message = document.createElement('p')
+    message.style.cssText = 'padding:32px;white-space:pre-wrap'
+    message.textContent = `启动失败，已有数据未被删除。\n${error instanceof Error ? error.message : String(error)}\n请关闭应用后重试，不要清除应用数据。`
+    root.append(message)
+  }
+  document.getElementById('boot-screen')?.remove()
+})

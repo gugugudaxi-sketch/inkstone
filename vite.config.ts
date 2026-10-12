@@ -66,10 +66,14 @@ const getVendorChunkName = (id: string) => {
 const config: UserConfigFnPromise = async ({ mode, command }) => ({
   plugins: [
     react(),
+    ...(mode === 'offline' ? [{ name: 'inkstone:local-html', transformIndexHtml(html: string) {
+      return html.replaceAll('inkstone.ui', 'inkstone.local.ui').replaceAll('inkstone-locale', 'inkstone-local-locale')
+        .replace(/<link rel="manifest"[^>]*>/g, '').replace('<title>Inkstone</title>', '<title>Inkstone 本地版</title>')
+    } }] : []),
     katexWoff2Only(),
     tailwindcss(),
-    inkstonePwa(),
-    ...(mode === 'demo'
+    ...(mode === 'offline' ? [] : [inkstonePwa()]),
+    ...((mode === 'demo' || mode === 'offline')
       ? []
       : [
           (await import('@cloudflare/vite-plugin')).cloudflare({
@@ -101,8 +105,8 @@ const config: UserConfigFnPromise = async ({ mode, command }) => ({
   },
 
   build: {
-    ...(mode === 'demo' ? { outDir: 'dist/demo' } : {}),
-    target: 'esnext',
+    ...(mode === 'offline' ? { outDir: 'dist/local' } : mode === 'demo' ? { outDir: 'dist/demo' } : {}),
+    target: mode === 'offline' ? 'es2022' : 'esnext',
     sourcemap: false,
     chunkSizeWarningLimit: 250,
     cssMinify: 'lightningcss',

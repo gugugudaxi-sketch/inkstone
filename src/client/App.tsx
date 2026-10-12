@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from './lib/runtime'
 import { CustomFontLoader } from './lib/custom-font'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { ConfirmHost } from './components/overlay'
@@ -35,11 +36,11 @@ export function App() {
   useEffect(() => watchSystemTheme(), [])
 
   useEffect(() => {
-    initializePwa()
+    if (!IS_LOCAL_MODE) initializePwa()
   }, [])
 
   useEffect(() => {
-    if (!shareSlug && status !== 'loading') requestOfflineWarmup()
+    if (!IS_LOCAL_MODE && !shareSlug && status !== 'loading') requestOfflineWarmup()
   }, [shareSlug, status])
 
   useEffect(() => {

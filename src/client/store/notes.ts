@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../lib/runtime'
 /** Coordinates the note cache, offline write-ahead log, optimistic updates, and server synchronization. */
 import { create, type StoreApi } from 'zustand';
 import { useMemo } from 'react';
@@ -158,7 +159,7 @@ export const useNotes = create<NotesState>((set, get) => ({
     saveStatus: 'idle',
     lastSavedAt: 0,
     pendingCount: 0,
-    online: typeof navigator === 'undefined' ? true : navigator.onLine,
+    online: IS_LOCAL_MODE || typeof navigator === 'undefined' ? true : navigator.onLine,
     bootstrap() {
 
         if (bootstrapPromise)

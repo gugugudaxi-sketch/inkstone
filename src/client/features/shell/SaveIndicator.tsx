@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { CloudOff } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { Tooltip } from '../../components/overlay';
@@ -16,7 +17,7 @@ export function SaveIndicator() {
     const dirty = status === 'dirty';
     const synced = status === 'synced' || status === 'idle';
     const savedAgo = useRelativeTime(lastSavedAt, !offline && !saving && !dirty);
-    const label = offline
+    const label = IS_LOCAL_MODE && !offline && !saving && !dirty ? '已保存到本机' : offline
         ? pending
             ? t("shell.offline_value0_changes_pending", { value0: pending })
             : t("shell.offline_changes_are_saved_locally")

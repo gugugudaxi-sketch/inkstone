@@ -48,12 +48,22 @@ interface DemoBackend {
   fetch: (request: Request) => Promise<Response>
 }
 
-export function createDemoBackend(): DemoBackend {
-  const state = createDemoState()
+export interface BackendOptions {
+  state?: DemoState
+  local?: boolean
+  persist?: (state: DemoState) => Promise<void>
+}
+
+export function createDemoBackend(options: BackendOptions = {}): DemoBackend {
+  const state = options.state ?? createDemoState()
   const app = new Hono()
 
   app.use('/api/*', async (c, next) => {
     const path = c.req.path
+    if (options.local && (/^\/api\/(?:backup|mcp|share|public)(?:\/|$)/.test(path) ||
+      /^\/api\/auth\/(?:login|logout|register|password|totp)/.test(path) || path === '/api/settings/registration')) {
+      return apiError(403, 'local_only', '本地版不提供云同步、远程分享或账号服务')
+    }
     if (
       path === '/api/site' ||
       path === '/api/auth/session' ||
@@ -66,8 +76,8 @@ export function createDemoBackend(): DemoBackend {
     return next()
   })
 
-  app.get('/api/site', (c) => c.json(siteInfo(state)))
-  app.get('/api/auth/session', (c) => c.json(sessionInfo(state)))
+  app.get('/api/site', (c) => c.json(siteInfo(state, options.local)))
+  app.get('/api/auth/session', (c) => c.json(sessionInfo(state, options.local)))
   app.post('/api/auth/login', async (c) => {
     const body = await jsonBody(c.req.raw)
     const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : ''
@@ -76,7 +86,7 @@ export function createDemoBackend(): DemoBackend {
       return apiError(401, 'invalid_credentials', 'Invalid username or password')
     }
     state.authenticated = true
-    return c.json(sessionInfo(state))
+    return c.json(sessionInfo(state, options.local))
   })
   app.post('/api/auth/register', () => apiError(403, 'registration_closed', 'Registration is closed'))
   app.post('/api/auth/logout', (c) => {
@@ -716,7 +726,7 @@ export function createDemoBackend(): DemoBackend {
       }
     }
     const id = newDemoId()
-    const url = await browserFileUrl(file)
+    const url = options.local ? `/api/files/${id}` : await browserFileUrl(file)
     const meta = {
       id,
       noteId,
@@ -740,6 +750,7 @@ export function createDemoBackend(): DemoBackend {
   app.delete('/api/files/:id', (c) => {
     const attachment = state.attachments.get(c.req.param('id'))
     if (!attachment) return apiError(404, 'not_found', 'Attachment not found')
+    if ((attachmentReferenceCounts(state).get(attachment.meta.id) ?? 0) > 0) return apiError(409, 'conflict', '文件仍被笔记或字体设置引用')
     revokeAttachment(attachment.meta.url)
     state.attachments.delete(attachment.meta.id)
     return c.json({ ok: true as const })
@@ -1019,12 +1030,13 @@ export function createDemoBackend(): DemoBackend {
             JSON.parse(new TextDecoder().decode(bundleEntry.data)),
             result,
             new Map(entries.map((entry) => [entry.path.toLocaleLowerCase(), entry.data])),
+            options.local,
           )
         } else if (value.name.toLowerCase().endsWith('.json')) {
           if (value.size > LIMITS.importBundleMaxBytes) {
             throw new Error('The export file cannot exceed 32 MB')
           }
-          await importBundle(state, JSON.parse(await value.text()), result)
+          await importBundle(state, JSON.parse(await value.text()), result, undefined, options.local)
         } else {
           if (value.size > LIMITS.contentMaxBytes) {
             throw new Error(`A note file cannot exceed ${LIMITS.contentMaxBytes / 1_000_000} MB`)
@@ -1043,7 +1055,35 @@ export function createDemoBackend(): DemoBackend {
 
   app.all('/api/*', () => apiError(404, 'not_found', 'Demo endpoint not found'))
 
-  return { fetch: (request) => Promise.resolve(app.fetch(request)) }
+  let queue: Promise<unknown> = Promise.resolve()
+  return { fetch: (request) => {
+    if (!options.persist) return Promise.resolve(app.fetch(request))
+    const task = queue.then(async () => {
+      const write = request.method !== 'GET' && request.method !== 'HEAD'
+      // A detached snapshot allows the whole mutation (including import) to roll back.
+      const before = write ? cloneBackendState(state) : null
+      try {
+        const response = await app.fetch(request)
+        if (write && response.ok) await options.persist!(state)
+        else if (before) Object.assign(state, before)
+        return response
+      } catch (error) {
+        if (before) Object.assign(state, before)
+        console.error('Local write failed', error)
+        return apiError(507, 'storage_failed', '本地存储失败，改动未保存。请检查手机剩余空间后重试。')
+      }
+    })
+    queue = task.catch(() => {})
+    return task
+  } }
+}
+
+export function cloneBackendState(state: DemoState): DemoState {
+  const { attachments, ...metadata } = state
+  const clone = structuredClone(metadata)
+  return { ...clone, attachments: new Map([...attachments].map(([id, item]) =>
+    [id, { meta: { ...item.meta }, file: item.file }])) }
+
 }
 
 function demoMcpSettings(now = Date.now()): McpSettingsInfo {
@@ -1089,23 +1129,23 @@ function demoMcpSettings(now = Date.now()): McpSettingsInfo {
   }
 }
 
-function siteInfo(state: DemoState) {
+function siteInfo(state: DemoState, local = false) {
   return {
-    name: 'Inkstone Demo',
+    name: local ? 'Inkstone 本地版' : 'Inkstone Demo',
     initialized: true,
     registrationOpen: state.registrationOpen,
     r2Enabled: false,
-    kvEnabled: false,
-    attachmentStorage: null,
+    kvEnabled: local,
+    attachmentStorage: local ? 'kv' : null,
     realtimeEnabled: false,
     version: APP_VERSION,
   } as const
 }
 
-function sessionInfo(state: DemoState): SessionInfo {
+function sessionInfo(state: DemoState, local = false): SessionInfo {
   return {
     user: state.authenticated ? state.user : null,
-    site: siteInfo(state),
+    site: siteInfo(state, local),
     settings: state.authenticated ? state.settings : null,
   }
 }
@@ -1231,6 +1271,7 @@ function folderDescendants(state: DemoState, rootId: string): Set<string> {
 
 function attachmentReferenceCounts(state: DemoState): Map<string, number> {
   const references = new Map<string, number>()
+  for (const font of state.settings.appearance.customFont.fonts) references.set(font.id, 1)
   for (const note of state.notes.values()) {
     for (const id of extractAttachmentIds(note.content)) {
       if (!state.attachments.has(id)) continue
@@ -1340,7 +1381,10 @@ function exportBundle(state: DemoState): ExportBundle {
     tags: listTags(state),
     notes: [...state.notes.values()],
     attachments: [],
-  }
+    settings: { customFont: state.settings.appearance.customFont },
+    localSettings: state.settings,
+    localVersions: [...state.versions],
+  } as ExportBundle
 }
 
 async function exportResponse(state: DemoState, format: 'json' | 'zip'): Promise<Response> {
@@ -1440,12 +1484,13 @@ async function importBundle(
   value: unknown,
   result: ImportResult,
   archiveEntries?: Map<string, Uint8Array>,
+  local = false,
 ): Promise<void> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid export file')
   const bundle = value as Partial<ExportBundle>
   if (!Array.isArray(bundle.notes)) throw new Error('The export contains no notes')
   const importedAttachments = archiveEntries
-    ? await importBundleAttachments(state, Array.isArray(bundle.attachments) ? bundle.attachments : [], archiveEntries, result)
+    ? await importBundleAttachments(state, Array.isArray(bundle.attachments) ? bundle.attachments : [], archiveEntries, result, local)
     : { urls: new Map<string, string>(), sourceNotes: new Map<string, string | null>() }
   if (!archiveEntries && Array.isArray(bundle.attachments) && bundle.attachments.length > 0) {
     result.skippedAttachments += bundle.attachments.length
@@ -1454,7 +1499,7 @@ async function importBundle(
   const folderMap = new Map<string, string>()
   for (const raw of Array.isArray(bundle.folders) ? bundle.folders : []) {
     if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string') continue
-    const id = state.folders.has(raw.id) ? newDemoId() : raw.id
+    const id = local ? raw.id : state.folders.has(raw.id) ? newDemoId() : raw.id
     folderMap.set(raw.id, id)
     state.folders.set(id, {
       id,
@@ -1480,7 +1525,9 @@ async function importBundle(
       const url = importedAttachments.urls.get(sourceId)
       if (url) content = content.replaceAll(`/api/files/${sourceId}`, url)
     }
-    const id = createImportedNote(state, content, typeof raw.title === 'string' ? raw.title : undefined, folderId)
+    if (local && typeof raw.id === 'string' && state.notes.has(raw.id)) { result.skippedNotes++; continue }
+    const id = createImportedNote(state, content, typeof raw.title === 'string' ? raw.title : undefined, folderId,
+      local && typeof raw.id === 'string' && /^[0-9a-hjkmnp-tv-z]{26}$/.test(raw.id) ? raw : undefined)
     if (typeof raw.id === 'string') noteMap.set(raw.id, id)
     result.createdNotes++
   }
@@ -1489,6 +1536,27 @@ async function importBundle(
     if (!attachment) continue
     attachment.meta = { ...attachment.meta, noteId: sourceNoteId ? noteMap.get(sourceNoteId) ?? null : null }
   }
+  if (local) {
+    const extended = value as Record<string, unknown>
+    const settings = extended.localSettings
+    if (settings && typeof settings === 'object') state.settings = mergeSettingsPatch(state.settings, settings)
+    const fontSettings = (extended.settings as { customFont?: unknown } | undefined)?.customFont
+    if (fontSettings) state.settings = mergeSettingsPatch(state.settings, { appearance: { customFont: fontSettings } })
+    state.settings.appearance.customFont.fonts = state.settings.appearance.customFont.fonts.filter((f) => state.attachments.has(f.id))
+    if (!state.settings.appearance.customFont.fonts.some((f) => f.id === state.settings.appearance.customFont.activeId)) state.settings.appearance.customFont.activeId = null
+    state.settings.sync.realtime = false
+    for (const raw of Array.isArray(bundle.tags) ? bundle.tags : []) {
+      if (raw && typeof raw.name === 'string') { state.tagIds.set(raw.name, raw.id); state.tagColors.set(raw.name, organizerColorOrNull(raw.color)) }
+    }
+    if (Array.isArray(extended.localVersions)) {
+      for (const entry of extended.localVersions) {
+        if (!Array.isArray(entry) || typeof entry[0] !== 'string' || !Array.isArray(entry[1]) || !state.notes.has(entry[0])) continue
+        const versions = entry[1].filter((v: unknown): v is NoteVersion => Boolean(v && typeof v === 'object' && typeof (v as NoteVersion).content === 'string' && typeof (v as NoteVersion).id === 'string'))
+        state.versions.set(entry[0], versions.slice(0, 100))
+      }
+    }
+  }
+
 }
 
 function createImportedNote(
@@ -1496,9 +1564,10 @@ function createImportedNote(
   content: string,
   title: string | undefined,
   folderId: string | null,
+  source?: Partial<Note>,
 ): string {
   const now = Date.now()
-  const id = newDemoId()
+  const id = source?.id ?? newDemoId()
   const note = refreshNote({
     id,
     title: title ?? deriveTitle(content),
@@ -1516,6 +1585,7 @@ function createImportedNote(
     createdAt: now,
     updatedAt: now,
     deletedAt: null,
+    ...(source ? { isStarred: source.isStarred === true, isPinned: source.isPinned === true, isArchived: source.isArchived === true, createdAt: Number.isFinite(source.createdAt) ? source.createdAt! : now, deletedAt: Number.isFinite(source.deletedAt) ? source.deletedAt! : null } : {}),
   }, content, title)
   state.notes.set(id, note)
   return id
@@ -1526,6 +1596,7 @@ async function importBundleAttachments(
   rawAttachments: ExportAttachment[],
   archiveEntries: Map<string, Uint8Array>,
   result: ImportResult,
+  local = false,
 ): Promise<{ urls: Map<string, string>, sourceNotes: Map<string, string | null> }> {
   const prepared: Array<{
     sourceId: string
@@ -1584,7 +1655,7 @@ async function importBundleAttachments(
     prepared.push({
       sourceId: raw.id,
       sourceNoteId: typeof raw.noteId === 'string' && /^[0-9a-hjkmnp-tv-z]{26}$/.test(raw.noteId) ? raw.noteId : null,
-      id: state.attachments.has(raw.id) ? newDemoId() : raw.id,
+      id: local ? raw.id : state.attachments.has(raw.id) ? newDemoId() : raw.id,
       filename,
       mime,
       width: Number.isFinite(raw.width) ? raw.width : null,
@@ -1607,7 +1678,7 @@ async function importBundleAttachments(
         type: item.mime,
         lastModified: item.createdAt,
       })
-      const url = await browserFileUrl(file)
+      const url = local ? `/api/files/${item.id}` : await browserFileUrl(file)
       state.attachments.set(item.id, {
         file,
         meta: {

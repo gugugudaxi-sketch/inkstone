@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { backupRunsResource, backupTargetsResource, mcpResource, statsResource, totpResource } from './resources'
 import { useSession } from '../../store/session'
 
@@ -11,7 +12,7 @@ export const settingsLoaders = {
   account: () => import('./AccountSettings').then((m) => ({ default: m.AccountSettings })),
   data: () => import('./DataSettings').then((m) => ({ default: m.DataSettings })),
   shares: () => import('./SharedNotes').then((m) => ({ default: m.SharedNotes })),
-  about: () => import('./AboutSettings').then((m) => ({ default: m.AboutSettings })),
+  about: () => IS_LOCAL_MODE ? import('../../local/AboutLocal').then((m) => ({ default: m.AboutLocal })) : import('./AboutSettings').then((m) => ({ default: m.AboutSettings })),
 }
 
 export function warmSettingsSection(section: SettingsSection): void {

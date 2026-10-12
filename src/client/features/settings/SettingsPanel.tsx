@@ -10,7 +10,7 @@ import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { AppearanceSettings } from './AppearanceSettings';
 import { useUi } from '../../store/ui';
 import { useSession } from '../../store/session';
-import { UI_STORAGE_KEY } from '../../lib/runtime';
+import { IS_LOCAL_MODE, UI_STORAGE_KEY } from '../../lib/runtime';
 import { scheduleSettingsWarmup, settingsLoaders, warmSettingsSection, type SettingsSection } from './sections';
 import { t } from "../../lib/i18n";
 type Section = SettingsSection;
@@ -29,7 +29,7 @@ export const SECTIONS: {
     { id: 'data', label: () => t("settings.data"), icon: <Database size={14}/> },
     { id: 'shares', label: () => t("share.shared_notes"), icon: <Link2 size={14}/> },
     { id: 'about', label: () => t("settings.about"), icon: <Info size={14}/> },
-];
+].filter((item) => !IS_LOCAL_MODE || ['appearance', 'editor', 'data', 'about'].includes(item.id)) as typeof SECTIONS;
 export function SettingsPanel({ onClose }: {
     onClose: () => void;
 }) {

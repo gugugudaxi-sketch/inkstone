@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from './runtime'
 import { useEffect, useRef } from 'react'
 import type { RealtimeMessage } from '@shared/types'
 import { CLIENT_ID } from './api'
@@ -56,6 +57,7 @@ export class SyncEngine {
   }
 
   start(): void {
+    if (IS_LOCAL_MODE) return
     this.claimLeadership()
     document.addEventListener('visibilitychange', this.onVisibility)
     window.addEventListener('focus', this.onFocus)

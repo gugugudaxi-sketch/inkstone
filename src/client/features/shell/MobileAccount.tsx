@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { useState } from 'react';
 import { ArrowLeft, ChevronRight, LogOut, Waypoints } from 'lucide-react';
 import { ACCENTS } from '@shared/constants';
@@ -32,6 +33,6 @@ export function MobileAccount() {
             <button type="button" onClick={() => useUi.getState().openPanel('graph')} className="flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm active:bg-[var(--bg-active)]"><Waypoints size={16} aria-hidden="true"/><span className="flex-1">{t('common.graph')}</span><ChevronRight size={16} aria-hidden="true"/></button>
         </div>
         <div className="min-h-6 flex-1"/>
-        <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={async () => { setLoggingOut(true); try { await logout(); } finally { setLoggingOut(false); } }} className="mt-4 flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm text-[var(--danger)] active:bg-[var(--bg-active)] disabled:opacity-50"><LogOut size={16} aria-hidden="true"/>{t('sidebar.log_out')}</button>
+        {!IS_LOCAL_MODE && <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={async () => { setLoggingOut(true); try { await logout(); } finally { setLoggingOut(false); } }} className="mt-4 flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm text-[var(--danger)] active:bg-[var(--bg-active)] disabled:opacity-50"><LogOut size={16} aria-hidden="true"/>{t('sidebar.log_out')}</button>}
     </section>;
 }

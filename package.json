@@ -37,7 +37,9 @@
     "comments:check": "node scripts/check-comments.mjs",
     "test:e2e": "node scripts/e2e.mjs",
     "cf-typegen": "wrangler types",
-    "cf-typegen:kv": "wrangler types --config wrangler.kv.toml"
+    "cf-typegen:kv": "wrangler types --config wrangler.kv.toml",
+    "build:local": "tsc -b && vite build --mode offline",
+    "dev:local": "vite --mode offline"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "0.10.2",

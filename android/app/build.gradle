@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'dev.inkstone.local'
+    buildFeatures { buildConfig true }
+    compileSdk 35
+    testOptions { animationsDisabled true }
+    defaultConfig {
+        applicationId 'dev.inkstone.local'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    // Signing remains explicit: keep the same private key for every upgrade.
+    signingConfigs {
+        localRelease {
+            if (System.getenv('INKSTONE_KEYSTORE')) {
+                storeFile file(System.getenv('INKSTONE_KEYSTORE'))
+                storePassword System.getenv('INKSTONE_STORE_PASSWORD')
+                keyAlias System.getenv('INKSTONE_KEY_ALIAS')
+                keyPassword System.getenv('INKSTONE_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.localRelease }
+    }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.12.1' }

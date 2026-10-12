@@ -1,3 +1,4 @@
+export const IS_LOCAL_MODE = import.meta.env.MODE === 'offline'
 export const IS_DEMO_MODE = import.meta.env.MODE === 'demo'
 
 export const DEMO_CREDENTIALS = {
@@ -11,6 +12,6 @@ export function initialLoginCredentials(demo = IS_DEMO_MODE): { username: string
     : { username: '', password: '' }
 }
 
-export const CLIENT_DATABASE_NAME = IS_DEMO_MODE ? 'inkstone-demo' : 'inkstone'
-export const UI_STORAGE_KEY = IS_DEMO_MODE ? 'inkstone.demo.ui' : 'inkstone.ui'
-export const LOCALE_STORAGE_KEY = IS_DEMO_MODE ? 'inkstone-demo-locale' : 'inkstone-locale'
+export const CLIENT_DATABASE_NAME = IS_LOCAL_MODE ? 'inkstone-local-cache' : IS_DEMO_MODE ? 'inkstone-demo' : 'inkstone'
+export const UI_STORAGE_KEY = IS_LOCAL_MODE ? 'inkstone.local.ui' : IS_DEMO_MODE ? 'inkstone.demo.ui' : 'inkstone.ui'
+export const LOCALE_STORAGE_KEY = IS_LOCAL_MODE ? 'inkstone-local-locale' : IS_DEMO_MODE ? 'inkstone-demo-locale' : 'inkstone-locale'

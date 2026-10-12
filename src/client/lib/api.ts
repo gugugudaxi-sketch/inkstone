@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from './runtime'
 import { CLIENT_HEADER } from '@shared/constants'
 import type { MarkdownBackupManifest } from '@shared/backup-format'
 import type {
@@ -210,6 +211,12 @@ async function fetchDownload(path: string, fallbackName: string): Promise<{ resp
 }
 
 async function saveDownload(format: 'json' | 'zip'): Promise<void> {
+  if (IS_LOCAL_MODE && window.InkstoneNative) {
+    const { response, filename } = await fetchDownload(`/api/export?format=${format}`, `inkstone-backup.${format}`)
+    const { saveNativeBlob } = await import('../local/runtime')
+    await saveNativeBlob(await response.blob(), filename.replace('inkstone-demo', 'inkstone-local'))
+    return
+  }
   if (format === 'zip') {
     const picker = (window as Window & {
       showSaveFilePicker?: (options: {

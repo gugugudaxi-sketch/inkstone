@@ -1,3 +1,4 @@
+import { IS_LOCAL_MODE } from '../../lib/runtime'
 import { APP_SHORTCUTS } from '../../lib/shortcuts';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
@@ -479,7 +480,7 @@ export function Workspace({ onMobileBack, pane = 'active', grouped = false, }: {
                 {(isMobile ? mobileOutlineOpen : outlineOpen) ? <PanelRightClose size={14}/> : <ListTree size={14}/>}
               </IconButton>
             </Tooltip>)}
-          {!isMobile && (<Tooltip label={t("workspace.share")}>
+          {!IS_LOCAL_MODE && !isMobile && (<Tooltip label={t("workspace.share")}>
               <IconButton label={t("workspace.share")} size="sm" onClick={() => openPanel('share')}>
                 <Share2 size={14}/>
               </IconButton>
@@ -511,7 +512,7 @@ export function Workspace({ onMobileBack, pane = 'active', grouped = false, }: {
 
       {backlinksOpen && paneActive && <BacklinksPanel noteId={note.id}/>}
 
-      <Menu anchor={moreButtonRef} open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)} items={grouped ? groupedItems : mobileItems} align="end" width={220}/>
+      <Menu anchor={moreButtonRef} open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)} items={(grouped ? groupedItems : mobileItems).filter((item) => !IS_LOCAL_MODE || item.id !== 'share')} align="end" width={220}/>
       {isMobile && (<Drawer open={mobileOutlineOpen} onClose={() => setMobileOutlineOpen(false)} side="right" width={320} title={t("common.outline")}>
           <Outline headings={headings} scrollerRef={previewScrollerRef} className="max-h-none w-full self-stretch py-3" onSelect={(heading) => {
                 jumpToHeading(heading);
